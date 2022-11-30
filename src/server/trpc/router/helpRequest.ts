@@ -1,16 +1,13 @@
-import { z } from "zod";
-
 import { router, publicProcedure } from "../trpc";
 
 export const helpRequestRouter = router({
-  hello: publicProcedure
-    .input(z.object({ text: z.string().nullish() }).nullish())
-    .query(({ input }) => {
-      return {
-        greeting: `Hello ${input?.text ?? "world"}`,
-      };
-    }),
-  getAll: publicProcedure.query(({ ctx }) => {
-    return ctx.prisma.example.findMany();
+  createHelpRequest: publicProcedure.mutation(async ({ ctx }) => {
+    const helpRequest = await ctx.prisma.helpRequest.create({ data: {} });
+
+    return helpRequest;
+  }),
+  getHelpRequest: publicProcedure.query(async ({ ctx }) => {
+    const helpRequests = await ctx.prisma.helpRequest.findMany();
+    return helpRequests;
   }),
 });

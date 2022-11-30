@@ -16,7 +16,13 @@ export const HelpWidget = () => {
     { message: "I need help fixing my computer", id: "1", sender: "1" },
   ]);
 
-  const hello = trpc.example.hello.useQuery({ text: "from tRPC" });
+  const createHelpRequestMutation =
+    trpc.helpRequest.createHelpRequest.useMutation();
+
+  const handlleOpenSupportWidget = () => {
+    setIsChatPanelDisplayed(true);
+    createHelpRequestMutation.mutate();
+  };
 
   return isChatPanelDisplayed ? (
     <div className="fixed bottom-10 right-10 flex h-96 w-72 flex-col justify-between bg-white p-6">
@@ -50,7 +56,7 @@ export const HelpWidget = () => {
     </div>
   ) : (
     <button
-      onClick={() => setIsChatPanelDisplayed(true)}
+      onClick={handlleOpenSupportWidget}
       className="fixed bottom-10 right-10 cursor-pointer rounded-xl bg-emerald-500 p-2 px-3 text-white hover:bg-emerald-600"
     >
       Speek to our Support Team
