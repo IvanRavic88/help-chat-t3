@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { RtmChannel, RtmMessage } from "agora-rtm-sdk";
+import React, { useRef, useState } from "react";
 import { trpc } from "../utils/trpc";
 
 type TMessage = {
@@ -10,18 +11,46 @@ type TMessage = {
 export const HelpWidget = () => {
   const [isChatPanelDisplayed, setIsChatPanelDisplayed] = useState(false);
   const [senderId, setSenderId] = useState("0");
+  const [text, setText] = useState("");
+  const channelRef = useRef<RtmChannel | null>(null);
 
-  const [messages, setMessage] = useState<TMessage[]>([
+  const [messages, setMessages] = useState<TMessage[]>([
     { message: "Hello, how can we help you today?", id: "2", sender: "0" },
-    { message: "I need help fixing my computer", id: "1", sender: "1" },
   ]);
 
   const createHelpRequestMutation =
     trpc.helpRequest.createHelpRequest.useMutation();
 
-  const handlleOpenSupportWidget = () => {
+  const handlleOpenSupportWidget = async () => {
     setIsChatPanelDisplayed(true);
-    createHelpRequestMutation.mutate();
+    const helpRequest = await createHelpRequestMutation.mutateAsync();
+
+    const { default: AgoraRTM } = await import("agora-rtm-sdk");
+    const client = AgoraRTM.createInstance(process.env.NEXT_PUBLIC_AGORA_ID!);
+    await client.login({
+      uid: `${Math.floor(Math.random() * 250)}`,
+    });
+    const channel = await client.createChannel(helpRequest.id);
+    channelRef.current = channel;
+    await channel.join();
+
+    channel.on("channelMessage", (message: RtmMessage) => {
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { message: message.text ?? "", id: Math.random() + "", sender: "1" },
+      ]);
+    });
+  };
+
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const channel = channelRef.current;
+    channel?.sendMessage({ text });
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      { message: text, id: Math.random() + "", sender: senderId },
+    ]);
+    setText("");
   };
 
   return isChatPanelDisplayed ? (
@@ -44,8 +73,10 @@ export const HelpWidget = () => {
           </li>
         ))}
       </ul>
-      <form className="flex">
+      <form onSubmit={handleSendMessage} className="flex">
         <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           className="w-full border border-rose-300 p-1 px-2 focus:outline-none"
           type="text"
         />
