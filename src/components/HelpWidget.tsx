@@ -15,7 +15,11 @@ export const HelpWidget = () => {
   const channelRef = useRef<RtmChannel | null>(null);
 
   const [messages, setMessages] = useState<TMessage[]>([
-    { message: "Hello, how can we help you today?", id: "2", sender: "0" },
+    {
+      message: "Hello, how can we help you today?",
+      id: "vjkasf2r32",
+      sender: "1",
+    },
   ]);
 
   const createHelpRequestMutation =
@@ -29,6 +33,7 @@ export const HelpWidget = () => {
     const client = AgoraRTM.createInstance(process.env.NEXT_PUBLIC_AGORA_ID!);
     await client.login({
       uid: `${Math.floor(Math.random() * 250)}`,
+      token: undefined,
     });
     const channel = await client.createChannel(helpRequest.id);
     channelRef.current = channel;
