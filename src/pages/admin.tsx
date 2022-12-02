@@ -1,11 +1,53 @@
+import type { HelpRequest } from "@prisma/client";
+import type { RtmChannel, RtmMessage } from "agora-rtm-sdk";
 import type { NextPage } from "next";
 import Head from "next/head";
+import { useRef, useState } from "react";
 import { trpc } from "../utils/trpc";
+import type { TMessage } from "../components/HelpWidget";
+import { ChatPanel } from "../components/ChatPanel";
 
 const AdminPage: NextPage = () => {
+  // const [senderId, setSenderId] = useState("1");
   const helpRequestQuery = trpc.helpRequest.getHelpRequest.useQuery();
+  const [messages, setMessages] = useState<TMessage[]>([]);
+  const channelRef = useRef<RtmChannel | null>(null);
+  const [text, setText] = useState("");
 
-  const handleHelpRequestClicked = () => {};
+  const handleHelpRequestClicked = async (helpRequest: HelpRequest) => {
+    setMessages([]);
+    if (channelRef.current) {
+      channelRef.current.leave();
+      channelRef.current = null;
+    }
+    const { default: AgoraRTM } = await import("agora-rtm-sdk");
+    const client = AgoraRTM.createInstance(process.env.NEXT_PUBLIC_AGORA_ID!);
+    await client.login({
+      uid: `${Math.floor(Math.random() * 250)}`,
+      token: undefined,
+    });
+    const channel = client.createChannel(helpRequest.id);
+    channelRef.current = channel;
+    await channel.join();
+
+    channel.on("ChannelMessage", (message: RtmMessage) => {
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { message: message.text ?? "", id: Math.random() + "", sender: "1" },
+      ]);
+    });
+  };
+
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const channel = channelRef.current;
+    channel?.sendMessage({ text });
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      { message: text, id: Math.random() + "", sender: "0" },
+    ]);
+    setText("");
+  };
 
   return (
     <>
@@ -15,41 +57,31 @@ const AdminPage: NextPage = () => {
         <link rel="icon" href="favicon.ico" />
       </Head>
 
-      <main className="container mx-auto flex min-h-screen flex-col items-center justify-center">
-        <h1 className="text-5xl font-extrabold leading-normal text-gray-700">
+      <main className="container mx-auto flex min-h-screen flex-col">
+        <h1 className=" mb-2 text-3xl font-extrabold leading-normal text-gray-700">
           Admin Page
         </h1>
-        <section className="flex">
-          <div>
-            {helpRequestQuery.data?.map((helpRequest) => (
-              <button onClick={handleHelpRequestClicked} key={helpRequest.id}>
-                {helpRequest.id}
-              </button>
-            ))}
-          </div>
-          {/* <div>
-            <ul>
-              {messages.map(({ message, id, sender }) => (
-                <li
-                  key={id}
-                  className={`mb-2 rounded p-1 ${
-                    sender === senderId ? "bg-gray-50" : "bg-rose-50"
-                  }`}
+        <section className="flex gap-4">
+          <div className="rounded bg-white p-4">
+            <h2 className="mb-2 text-xl">Help Request Ids:</h2>
+            <div className="flex flex-col gap-2">
+              {helpRequestQuery.data?.map((helpRequest) => (
+                <button
+                  className="hover:text-orange-500"
+                  onClick={() => handleHelpRequestClicked(helpRequest)}
+                  key={helpRequest.id}
                 >
-                  {message}
-                </li>
+                  {helpRequest.id}
+                </button>
               ))}
-            </ul>
-            <form className="flex">
-              <input
-                className="w-full border border-rose-300 p-1 px-2 focus:outline-none"
-                type="text"
-              />
-              <button className="ml-2 rounded-xl bg-rose-500 p-1 px-2 text-white hover:bg-rose-600">
-                Send
-              </button>
-            </form>
-          </div> */}
+            </div>
+          </div>
+          <ChatPanel
+            text={text}
+            setText={setText}
+            messages={messages}
+            handleSendMessage={handleSendMessage}
+          />
         </section>
       </main>
     </>

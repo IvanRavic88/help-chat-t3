@@ -1,8 +1,10 @@
-import { RtmChannel, RtmMessage } from "agora-rtm-sdk";
+import type { HelpRequest } from "@prisma/client";
+import type { RtmChannel, RtmMessage } from "agora-rtm-sdk";
 import React, { useRef, useState } from "react";
 import { trpc } from "../utils/trpc";
+import { ChatPanel } from "./ChatPanel";
 
-type TMessage = {
+export type TMessage = {
   message: string;
   id: string;
   sender: string;
@@ -13,7 +15,7 @@ export const HelpWidget = () => {
   const [senderId, setSenderId] = useState("0");
   const [text, setText] = useState("");
   const channelRef = useRef<RtmChannel | null>(null);
-
+  const helpRequestRef = useRef<HelpRequest | null>(null);
   const [messages, setMessages] = useState<TMessage[]>([
     {
       message: "Hello, how can we help you today?",
@@ -25,6 +27,9 @@ export const HelpWidget = () => {
   const createHelpRequestMutation =
     trpc.helpRequest.createHelpRequest.useMutation();
 
+  const deleteHelpRequestMutation =
+    trpc.helpRequest.deleteHelpRequest.useMutation();
+
   const handlleOpenSupportWidget = async () => {
     setIsChatPanelDisplayed(true);
     const helpRequest = await createHelpRequestMutation.mutateAsync();
@@ -35,11 +40,12 @@ export const HelpWidget = () => {
       uid: `${Math.floor(Math.random() * 250)}`,
       token: undefined,
     });
+    helpRequestRef.current = helpRequest;
     const channel = await client.createChannel(helpRequest.id);
     channelRef.current = channel;
     await channel.join();
 
-    channel.on("channelMessage", (message: RtmMessage) => {
+    channel.on("ChannelMessage", (message: RtmMessage) => {
       setMessages((prevMessages) => [
         ...prevMessages,
         { message: message.text ?? "", id: Math.random() + "", sender: "1" },
@@ -58,37 +64,26 @@ export const HelpWidget = () => {
     setText("");
   };
 
+  const handleCloseWidget = async () => {
+    setIsChatPanelDisplayed(false);
+    channelRef.current?.leave();
+    channelRef.current = null;
+    if (!helpRequestRef.current) return;
+    await deleteHelpRequestMutation.mutateAsync({
+      id: helpRequestRef.current.id,
+    });
+    helpRequestRef.current = null;
+  };
+
   return isChatPanelDisplayed ? (
     <div className="fixed bottom-10 right-10 flex h-96 w-72 flex-col justify-between bg-white p-6">
-      <button
-        className="absolute top-1 right-3 hover:text-red-500"
-        onClick={() => setIsChatPanelDisplayed(false)}
-      >
-        X
-      </button>
-      <ul>
-        {messages.map(({ message, id, sender }) => (
-          <li
-            key={id}
-            className={`mb-2 rounded p-1 ${
-              sender === senderId ? "bg-gray-50" : "bg-rose-50"
-            }`}
-          >
-            {message}
-          </li>
-        ))}
-      </ul>
-      <form onSubmit={handleSendMessage} className="flex">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full border border-rose-300 p-1 px-2 focus:outline-none"
-          type="text"
-        />
-        <button className="ml-2 rounded-xl bg-rose-500 p-1 px-2 text-white hover:bg-rose-600">
-          Send
-        </button>
-      </form>
+      <ChatPanel
+        text={text}
+        setText={setText}
+        messages={messages}
+        onClose={handleCloseWidget}
+        handleSendMessage={handleSendMessage}
+      />
     </div>
   ) : (
     <button

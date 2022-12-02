@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 
 export const helpRequestRouter = router({
@@ -6,6 +7,15 @@ export const helpRequestRouter = router({
 
     return helpRequest;
   }),
+  deleteHelpRequest: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.helpRequest.delete({
+        where: {
+          id: input.id,
+        },
+      });
+    }),
   getHelpRequest: publicProcedure.query(async ({ ctx }) => {
     const helpRequests = await ctx.prisma.helpRequest.findMany();
     return helpRequests;
