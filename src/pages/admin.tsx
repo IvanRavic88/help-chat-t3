@@ -1,51 +1,27 @@
 import type { HelpRequest } from "@prisma/client";
-import type { RtmChannel, RtmMessage } from "agora-rtm-sdk";
+
 import type { NextPage } from "next";
 import Head from "next/head";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { trpc } from "../utils/trpc";
-import type { TMessage } from "../components/HelpWidget";
+
 import { ChatPanel } from "../components/ChatPanel";
+import { useRTM } from "../hooks/useRTM";
 
 const AdminPage: NextPage = () => {
-  // const [senderId, setSenderId] = useState("1");
-  const helpRequestQuery = trpc.helpRequest.getHelpRequest.useQuery();
-  const [messages, setMessages] = useState<TMessage[]>([]);
-  const channelRef = useRef<RtmChannel | null>(null);
+  const { messages, clearMessages, connectTo, sendMessage } = useRTM([]);
   const [text, setText] = useState("");
 
-  const handleHelpRequestClicked = async (helpRequest: HelpRequest) => {
-    setMessages([]);
-    if (channelRef.current) {
-      channelRef.current.leave();
-      channelRef.current = null;
-    }
-    const { default: AgoraRTM } = await import("agora-rtm-sdk");
-    const client = AgoraRTM.createInstance(process.env.NEXT_PUBLIC_AGORA_ID!);
-    await client.login({
-      uid: `${Math.floor(Math.random() * 250)}`,
-      token: undefined,
-    });
-    const channel = client.createChannel(helpRequest.id);
-    channelRef.current = channel;
-    await channel.join();
+  const helpRequestQuery = trpc.helpRequest.getHelpRequest.useQuery();
 
-    channel.on("ChannelMessage", (message: RtmMessage) => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { message: message.text ?? "", id: Math.random() + "", sender: "1" },
-      ]);
-    });
+  const handleHelpRequestClicked = async (helpRequest: HelpRequest) => {
+    clearMessages();
+    connectTo(helpRequest.id);
   };
 
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const channel = channelRef.current;
-    channel?.sendMessage({ text });
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { message: text, id: Math.random() + "", sender: "0" },
-    ]);
+    sendMessage(text);
     setText("");
   };
 

@@ -1,6 +1,7 @@
 import type { HelpRequest } from "@prisma/client";
-import type { RtmChannel, RtmMessage } from "agora-rtm-sdk";
+import type { RtmChannel } from "agora-rtm-sdk";
 import React, { useRef, useState } from "react";
+import { useRTM } from "../hooks/useRTM";
 import { trpc } from "../utils/trpc";
 import { ChatPanel } from "./ChatPanel";
 
@@ -11,18 +12,13 @@ export type TMessage = {
 };
 
 export const HelpWidget = () => {
+  const { messages, connectTo, sendMessage } = useRTM([
+    { message: "How can I help you?", id: "123124312r", sender: "0" },
+  ]);
   const [isChatPanelDisplayed, setIsChatPanelDisplayed] = useState(false);
-  const [senderId, setSenderId] = useState("0");
   const [text, setText] = useState("");
   const channelRef = useRef<RtmChannel | null>(null);
   const helpRequestRef = useRef<HelpRequest | null>(null);
-  const [messages, setMessages] = useState<TMessage[]>([
-    {
-      message: "Hello, how can we help you today?",
-      id: "vjkasf2r32",
-      sender: "1",
-    },
-  ]);
 
   const createHelpRequestMutation =
     trpc.helpRequest.createHelpRequest.useMutation();
@@ -33,34 +29,13 @@ export const HelpWidget = () => {
   const handlleOpenSupportWidget = async () => {
     setIsChatPanelDisplayed(true);
     const helpRequest = await createHelpRequestMutation.mutateAsync();
-
-    const { default: AgoraRTM } = await import("agora-rtm-sdk");
-    const client = AgoraRTM.createInstance(process.env.NEXT_PUBLIC_AGORA_ID!);
-    await client.login({
-      uid: `${Math.floor(Math.random() * 250)}`,
-      token: undefined,
-    });
     helpRequestRef.current = helpRequest;
-    const channel = await client.createChannel(helpRequest.id);
-    channelRef.current = channel;
-    await channel.join();
-
-    channel.on("ChannelMessage", (message: RtmMessage) => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { message: message.text ?? "", id: Math.random() + "", sender: "1" },
-      ]);
-    });
+    connectTo(helpRequest.id);
   };
 
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const channel = channelRef.current;
-    channel?.sendMessage({ text });
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { message: text, id: Math.random() + "", sender: senderId },
-    ]);
+    sendMessage(text);
     setText("");
   };
 
